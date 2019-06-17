@@ -30,14 +30,14 @@ module.exports = options => {
         throw new Error('The `directory` option is required');
     }
 
-    var appPath;
+    var baseElectron;
     if (electron.app) {
-        appPath = electron.app.getAppPath();
+        baseElectron = electron;
     } else {
-        appPath = electron.remote.app.getAppPath();
+        baseElectron = electron.remote;
     }
 
-    options.directory = path.resolve(appPath, options.directory);
+    options.directory = path.resolve(baseElectron.app.getAppPath(), options.directory);
 
     const handler = async(request, callback) => {
         const indexPath = path.join(options.directory, 'index.html');
@@ -48,12 +48,12 @@ module.exports = options => {
         });
     };
 
-    if (electron.protocol.registerStandardSchemes) {
+    if (baseElectron.protocol.registerStandardSchemes) {
         // Electron <=4
-        electron.protocol.registerStandardSchemes([options.scheme], { secure: true });
+        baseElectron.protocol.registerStandardSchemes([options.scheme], { secure: true });
     } else {
         // Electron >=5
-        electron.protocol.registerSchemesAsPrivileged([{
+        baseElectron.protocol.registerSchemesAsPrivileged([{
             scheme: options.scheme,
             privileges: {
                 secure: true,
@@ -63,11 +63,11 @@ module.exports = options => {
     }
 
     (async() => {
-        await electron.app.whenReady();
+        await baseElectron.app.whenReady();
 
         const session = options.partition ?
-            electron.session.fromPartition(options.partition) :
-            electron.session.defaultSession;
+            baseElectron.session.fromPartition(options.partition) :
+            baseElectron.session.defaultSession;
 
         session.protocol.registerFileProtocol(options.scheme, handler, error => {
             if (error) {
