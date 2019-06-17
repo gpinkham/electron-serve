@@ -1,77 +1,82 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const {promisify} = require('util');
+const { promisify } = require('util');
 const electron = require('electron');
 
 const stat = promisify(fs.stat);
 
 const getPath = async path_ => {
-	try {
-		const result = await stat(path_);
+    try {
+        const result = await stat(path_);
 
-		if (result.isFile()) {
-			return path_;
-		}
+        if (result.isFile()) {
+            return path_;
+        }
 
-		if (result.isDirectory()) {
-			return getPath(path.join(path_, 'index.html'));
-		}
-	} catch (_) {}
+        if (result.isDirectory()) {
+            return getPath(path.join(path_, 'index.html'));
+        }
+    } catch (_) {}
 };
 
 module.exports = options => {
-	options = Object.assign({
-		scheme: 'app'
-	}, options);
+    options = Object.assign({
+        scheme: 'app'
+    }, options);
 
-	// TODO: Make directory relative to app root. Document it.
-	if (!options.directory) {
-		throw new Error('The `directory` option is required');
-	}
+    // TODO: Make directory relative to app root. Document it.
+    if (!options.directory) {
+        throw new Error('The `directory` option is required');
+    }
 
-	options.directory = path.resolve(electron.app.getAppPath(), options.directory);
+    var appPath;
+    if (electron.app) {
+        appPath = electron.app.getAppPath();
+    } else {
+        appPath = electron.remote.app.getAppPath();
+    }
 
-	const handler = async (request, callback) => {
-		const indexPath = path.join(options.directory, 'index.html');
-		const filePath = path.join(options.directory, decodeURIComponent(new URL(request.url).pathname));
+    options.directory = path.resolve(appPath, options.directory);
 
-		callback({
-			path: (await getPath(filePath)) || indexPath
-		});
-	};
+    const handler = async(request, callback) => {
+        const indexPath = path.join(options.directory, 'index.html');
+        const filePath = path.join(options.directory, decodeURIComponent(new URL(request.url).pathname));
 
-	if (electron.protocol.registerStandardSchemes) {
-		// Electron <=4
-		electron.protocol.registerStandardSchemes([options.scheme], {secure: true});
-	} else {
-		// Electron >=5
-		electron.protocol.registerSchemesAsPrivileged([
-			{
-				scheme: options.scheme,
-				privileges: {
-					secure: true,
-					standard: true
-				}
-			}
-		]);
-	}
+        callback({
+            path: (await getPath(filePath)) || indexPath
+        });
+    };
 
-	(async () => {
-		await electron.app.whenReady();
+    if (electron.protocol.registerStandardSchemes) {
+        // Electron <=4
+        electron.protocol.registerStandardSchemes([options.scheme], { secure: true });
+    } else {
+        // Electron >=5
+        electron.protocol.registerSchemesAsPrivileged([{
+            scheme: options.scheme,
+            privileges: {
+                secure: true,
+                standard: true
+            }
+        }]);
+    }
 
-		const session = options.partition ?
-			electron.session.fromPartition(options.partition) :
-			electron.session.defaultSession;
+    (async() => {
+        await electron.app.whenReady();
 
-		session.protocol.registerFileProtocol(options.scheme, handler, error => {
-			if (error) {
-				throw error;
-			}
-		});
-	})();
+        const session = options.partition ?
+            electron.session.fromPartition(options.partition) :
+            electron.session.defaultSession;
 
-	return async win => {
-		await win.loadURL(`${options.scheme}://-`);
-	};
+        session.protocol.registerFileProtocol(options.scheme, handler, error => {
+            if (error) {
+                throw error;
+            }
+        });
+    })();
+
+    return async win => {
+        await win.loadURL(`${options.scheme}://-`);
+    };
 };
