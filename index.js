@@ -29,8 +29,11 @@ module.exports = options => {
     if (!options.directory) {
         throw new Error('The `directory` option is required');
     }
+    console.log('Options directory: ', options.directory);
 
     options.directory = path.resolve(electron.app.getAppPath(), options.directory);
+
+    console.log('Options directory: ', options.directory);
 
     const handler = async(request, callback) => {
         const indexPath = path.join(options.directory, 'index.html');
