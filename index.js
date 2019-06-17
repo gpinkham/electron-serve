@@ -36,10 +36,12 @@ module.exports = options => {
     console.log('Options directory: ', options.directory);
 
     const handler = async(request, callback) => {
+        console.log('File sent', new URL(request.url).pathname);
+
         const indexPath = path.join(options.directory, 'index.html');
         const filePath = path.join(options.directory, decodeURIComponent(new URL(request.url).pathname));
 
-        console.log(await getPath(filePath));
+        console.log('File Path', getPath(filePath));
 
         callback({
             path: (await getPath(filePath)) || indexPath
